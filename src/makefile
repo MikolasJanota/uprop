@@ -30,7 +30,7 @@ endif
 
 ifdef DBG
 	CFLAGS+=-O0
-	CFLAGS+=-ggdb
+	CFLAGS+=-g
 	CFLAGS+=-DDBG
 	MINISAT_DIR=./minisat/build/debug/lib
 	MSAT=ld

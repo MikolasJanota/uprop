@@ -6,10 +6,15 @@
  */
 #include "unit.h"
 
-Unit::Unit(const CNF& cnf) : conflict(false)
+static int verbose = 1;
+
+Unit::Unit(const CNF& cnf)
+    : conflict(false)
+    ,  que_head(0)
 {
     add_clauses(cnf);
 }
+
 Unit::~Unit() {
     for (auto w : watches)
         delete w;
@@ -20,6 +25,36 @@ bool Unit::add_clauses(const CNF& cnf) {
         if (!add_clause(c))
             return false;
     return true;
+}
+
+bool Unit::is_failed_lit(Lit l) {
+    assert(!conflict);
+    assert(que_head == trail.size());
+    if (verbose) std::cerr << l << "  testing"<<  std::endl;
+#ifdef DBG
+    if(value(l) != l_Undef)
+        std::cerr << l << "  already has a value " <<  value(l) <<  std::endl;
+#endif
+    assert(value(l) == l_Undef);
+    const auto orig = trail.size();
+    const auto orig_que_head = que_head;
+    schedule(l);
+    propagate();
+    const bool rv = conflict;
+    while (trail.size() > orig) {
+        if (verbose) std::cerr << trail.back() << "  popping has a value " <<  value(trail.back()) <<  std::endl;
+        values[var(trail.back())] = l_Undef;
+        trail.pop_back();
+    }
+    que_head = orig_que_head;
+    conflict = false;
+    return rv;
+}
+
+bool Unit::assert_lit(Lit literal) {
+    if (verbose) std::cerr << literal << " asserting" << std::endl;
+    schedule(literal);
+    return propagate();
 }
 
 
@@ -51,7 +86,7 @@ void Unit::eval(CNF& cnf) {
                 cnf.push_back(LitSet::mk(ls));
             } else {
                 const LitSet& orig_cl = original_clauses[i];
-                assert (LitSet(ls).equal(orig_cl));
+                /* assert (LitSet(ls).equal(orig_cl)); */
                 cnf.push_back(orig_cl);
             }
         }
@@ -106,25 +141,19 @@ bool Unit::add_clause(const LitSet& clause) {
 
 
 bool Unit::propagate() {
-    while (!trail.empty() && !conflict) {
-        const Lit literal = trail.back();
-        trail.pop_back();
-        if (!propagate(literal))
+    while (!conflict && que_head < trail.size()) {
+        if (!propagate(trail[que_head++]))
             conflict=true;
     }
     return !conflict;
 }
 
-void Unit::schedule(Lit literal) {
-    trail.push_back(literal);
-}
-
 void Unit::watch(Lit literal, size_t clause_index) {
     const size_t index = literal_index(literal);
-    if (index >= watches.size()) {
-        watches.resize(index+1);
+    if (index >= watches.size())
+        watches.resize(index+1, nullptr);
+    if (watches[index] == nullptr)
         watches[index] = new vector<size_t>();
-    }
     watches[index]->push_back(clause_index);
 }
 
@@ -134,18 +163,6 @@ void Unit::set_value(Var variable, lbool value) {
     values[index]=value;
 }
 
-
-lbool Unit::value(Var variable) const {
-    const size_t index = (size_t) variable;
-    if (index >= values.size()) return l_Undef;
-    return values[index];
-}
-
-lbool Unit::value(Lit literal) const {
-    const lbool v = value(var(literal));
-    if (v==l_Undef) return l_Undef;
-    return (v==l_False) == sign(literal) ? l_True : l_False;
-}
 
 bool Unit::propagate(Lit literal) {
     const Var variable = var(literal);
@@ -159,8 +176,10 @@ bool Unit::propagate(Lit literal) {
     if (li >= watches.size())
         return true; // the literal does not watch anything
     const vector<size_t>* const w = watches[li];
+    if (w == nullptr)
+        return true; // the literal does not watch anything
     bool return_value = true;
-    for (size_t clause_index: *w) {
+    for (size_t clause_index : *w) {
         assert(clause_index<clauses.size());
         LiteralVector& clause = clauses[clause_index];
         if (clause[0] == false_literal) {
