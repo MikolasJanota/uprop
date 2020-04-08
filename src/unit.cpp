@@ -6,6 +6,12 @@
  */
 #include "unit.h"
 
+#ifdef DBG
+#define TRACE(verbosity, command) do { if (verbose >= verbosity) {command }} while (false)
+#else
+#define TRACE(verbosity, command)
+#endif
+
 static int verbose = 1;
 
 Unit::Unit(const CNF& cnf)
@@ -30,11 +36,8 @@ bool Unit::add_clauses(const CNF& cnf) {
 bool Unit::is_failed_lit(Lit l) {
     assert(!conflict);
     assert(que_head == trail.size());
-    if (verbose) std::cerr << l << "  testing"<<  std::endl;
-#ifdef DBG
-    if(value(l) != l_Undef)
-        std::cerr << l << "  already has a value " <<  value(l) <<  std::endl;
-#endif
+    TRACE(2, std::cerr << l << " testing"<<  std::endl;);
+    TRACE(2, if(value(l) != l_Undef) std::cerr << l << " already has a value " <<  value(l) <<  std::endl;);
     assert(value(l) == l_Undef);
     const auto orig = trail.size();
     const auto orig_que_head = que_head;
@@ -42,7 +45,7 @@ bool Unit::is_failed_lit(Lit l) {
     propagate();
     const bool rv = conflict;
     while (trail.size() > orig) {
-        if (verbose) std::cerr << trail.back() << "  popping has a value " <<  value(trail.back()) <<  std::endl;
+        TRACE (2, std::cerr << trail.back() << " popping has a value " <<  value(trail.back()) <<  std::endl;);
         values[var(trail.back())] = l_Undef;
         trail.pop_back();
     }
@@ -52,7 +55,7 @@ bool Unit::is_failed_lit(Lit l) {
 }
 
 bool Unit::assert_lit(Lit literal) {
-    if (verbose) std::cerr << literal << " asserting" << std::endl;
+    TRACE (1, std::cerr << literal << " asserting" << std::endl;);
     schedule(literal);
     return propagate();
 }
@@ -101,7 +104,7 @@ bool Unit::add_clause(const LitSet& clause) {
     bool taut=false;
     bool change=false;
     for (Lit literal : clause) {
-        const lbool     v = value(literal);
+        const lbool v = value(literal);
         if (v==l_Undef) ls.push_back(literal);
         else {
             change=true;
@@ -167,50 +170,62 @@ void Unit::set_value(Var variable, lbool value) {
 bool Unit::propagate(Lit literal) {
     const Var variable = var(literal);
     const lbool literal_value = sign(literal) ? l_False : l_True;
-    if (value(variable) != l_Undef) {
+    if (value(variable) != l_Undef)
         return (literal_value == value(variable));
-    }
     set_value(variable, literal_value);
     const Lit false_literal = ~literal;
     const size_t li = literal_index(literal);
-    if (li >= watches.size())
+    if (li >= watches.size() || watches[li] == nullptr)
         return true; // the literal does not watch anything
-    const vector<size_t>* const w = watches[li];
-    if (w == nullptr)
-        return true; // the literal does not watch anything
+
+    // ws  are the clauses watched by literal, since the literal may stop watching some clauses,
+    // the vector may shrink, we do that via two indices
+    auto & ws  = *(watches[li]);
+    size_t read_index = 0; // index from which we are reading from ws
+    size_t write_index = 0; // index to which we are writing in ws
     bool return_value = true;
-    for (size_t clause_index : *w) {
-        assert(clause_index<clauses.size());
+    while (read_index < ws.size()) {
+        const size_t clause_index = ws[read_index++];
+        assert(clause_index < clauses.size());
         LiteralVector& clause = clauses[clause_index];
-        if (clause[0] == false_literal) {
+        if (clause[0] == false_literal) { // swap the  literal that just became false into position 1
             clause[0] = clause[1];
             clause[1] = false_literal;
         }
         assert(clause[1] == false_literal);
-        if (value(clause[0]) == l_True)
+        if (value(clause[0]) == l_True)  {
+            ws[write_index++] = clause_index;
             continue; // clause already true
-        size_t new_watch = 0;
-        for (size_t index = 2; index < clause.size(); ++index) { // find a new watch
-            if (value(clause[index]) != l_False) {
-                new_watch = index;
+        }
+        size_t new_watch_index = 0;
+        for (size_t i = 2; i < clause.size(); ++i) { // find a new watch
+            if (value(clause[i]) != l_False) {
+                new_watch_index = i;
                 break;
             }
         }
-        if (new_watch > 0) { // new watch found
-            assert(new_watch > 1);
-            watch(~clause[new_watch], clause_index);
+        if (new_watch_index > 0) { // new watch found
+            // swap the new watch into index 1, and the old watch literal into its index
+            assert(new_watch_index > 1);
+            watch(~clause[new_watch_index], clause_index);
             clause[1] = clause[0];
-            clause[0] = clause[new_watch];
-            clause[new_watch] = false_literal;
+            clause[0] = clause[new_watch_index];
+            clause[new_watch_index] = false_literal;
         } else { // no new watch found
-            if (value(clause[0]) == l_False) {
-                return_value = false; //  conflict
+            ws[write_index++] = clause_index;
+            if (value(clause[0]) == l_False) { //  conflict
+                TRACE (1, std::cerr << "conflict on " << clauses[clause_index] << std::endl;);
+                while (read_index < ws.size()) //  copy the rest of the watched clauses
+                    ws[write_index++] = ws[read_index++];
+                return_value = false;
                 break;
             }
-            //  unit clause
+            // unit clause
             assert(value(clause[0]) == l_Undef);
             schedule(clause[0]);
         }
     }
+    if (write_index < ws.size())
+        ws.resize(write_index);
     return return_value;
 }

@@ -61,40 +61,35 @@ int run_cnf(const string& flafile) {
     if (!original_propagation) {
         cout << "Original propagation already failed." << endl;
     }
-    bool stop;
+    bool fixpoint;
     int  cycle_count = 0;
     do {
         cout << "== CYCLE " <<  ++cycle_count << endl;
-        stop = true;
+        fixpoint = true;
         for (Var v = 1; v <= reader.get_max_id(); v++) {
             if (up.value(v) != l_Undef) {
                 cout << v << " already set to " << up.value(v) << endl;
                 continue;
             }
 
-            bool pos_true = false;
-            bool neg_true = false;
+            bool unsatisfiable = false;
             if (up.is_failed_lit(mkLit(v))) {
                 cout << "FAILED: " << mkLit(v) << endl;
-                up.assert_lit(~mkLit(v));
-                neg_true = true;
-            }
-
-            if (up.is_failed_lit(~mkLit(v))) {
+                unsatisfiable = !up.assert_lit(~mkLit(v));
+                fixpoint = false;
+            } else if (up.is_failed_lit(~mkLit(v))) {
                 cout << "FAILED: " << ~mkLit(v) << endl;
-                up.assert_lit(mkLit(v));
-                pos_true = true;
+                unsatisfiable = !up.assert_lit(mkLit(v));
+                fixpoint = false;
             }
 
-            if (pos_true && neg_true) {
-                cout << "UNSAT  by failed literals " << endl;
-                stop = true;
+            if (unsatisfiable) {
+                cout << "UNSAT by failed literals " << endl;
+                fixpoint = true;
                 break;
-            } else {
-                stop = stop && !pos_true && !neg_true;
             }
         }
-    } while (!stop);
+    } while (!fixpoint);
 
     return 0;
 }
