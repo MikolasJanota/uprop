@@ -8,9 +8,11 @@
 TF=/tmp/defs_${RANDOM}
 GITHEAD=`git rev-parse HEAD`
 echo '#define GITHEAD "'${GITHEAD}'"' >${TF}
-if [ -e defs.h ]; then
-    if diff -q defs.h ${TF} >/dev/null; then
-        echo defs remain;
+if [ -e defs.h ]
+then
+    if diff -q defs.h ${TF} >/dev/null
+    then
+        echo defs remain
     else
         /bin/cp ${TF} defs.h
     fi

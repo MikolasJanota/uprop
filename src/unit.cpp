@@ -12,7 +12,7 @@
 #define TRACE(verbosity, command)
 #endif
 
-static int verbose = 1;
+static int verbose = 0;
 
 Unit::Unit(const CNF& cnf)
     : conflict(false)
@@ -36,7 +36,7 @@ bool Unit::add_clauses(const CNF& cnf) {
 bool Unit::is_failed_lit(Lit l) {
     assert(!conflict);
     assert(que_head == trail.size());
-    TRACE(2, std::cerr << l << " testing"<<  std::endl;);
+    TRACE(1, std::cerr << l << " testing"<<  std::endl;);
     TRACE(2, if(value(l) != l_Undef) std::cerr << l << " already has a value " <<  value(l) <<  std::endl;);
     assert(value(l) == l_Undef);
     const auto orig = trail.size();
