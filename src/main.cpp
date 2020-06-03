@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include "auxiliary.h"
 #include "ReadCNF.h"
-using  namespace  std;
+using namespace std;
 int run_cnf(const string& flafile);
 
 int main(int argc, char** argv) {
@@ -71,6 +71,7 @@ int run_cnf(const string& flafile) {
     bool fixpoint;
     int  cycle_count = 0;
     bool all_defined;
+    int  failed_literal_counter = 0;
     do {
         cout << "== CYCLE " <<  ++cycle_count << endl;
         fixpoint = true;
@@ -87,10 +88,12 @@ int run_cnf(const string& flafile) {
                 cout << "FAILED: " << mkLit(v) << endl;
                 unsatisfiable = !up.assert_lit(~mkLit(v));
                 fixpoint = false;
+                ++failed_literal_counter;
             } else if (up.is_failed_lit(~mkLit(v))) {
                 cout << "FAILED: " << ~mkLit(v) << endl;
                 unsatisfiable = !up.assert_lit(mkLit(v));
                 fixpoint = false;
+                ++failed_literal_counter;
             }
 
             if (unsatisfiable) {
@@ -104,5 +107,6 @@ int run_cnf(const string& flafile) {
     if (all_defined)
         cout << "== Unique model" << endl;
 
+    cout << "== Failed literal counter:" << failed_literal_counter << endl;
     return EXIT_SUCCESS;
 }
