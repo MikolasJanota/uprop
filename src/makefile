@@ -89,7 +89,7 @@ ifdef USE_MINISAT
 all: $(MINISAT_LIB)
 endif
 
-all: make_defs
+all:
 	$(MAKE) sources
 	$(MAKE) $(PROGRAM_NAME)
 

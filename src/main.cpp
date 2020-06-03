@@ -6,7 +6,7 @@
  */
 
 #include "unit.h"
-#include "defs.h"
+/* #include "defs.h" */
 #include "minisat/utils/System.h"
 #include "minisat/utils/ParseUtils.h"
 #include "minisat/utils/Options.h"
@@ -25,7 +25,8 @@ int main(int argc, char** argv) {
 #ifndef NDEBUG
     cout << "c DEBUG version." << endl;
 #endif
-    cout<<"c uprop, v00.0, "<<GITHEAD<<endl;
+    /* cout<<"c uprop, v00.0, "<<GITHEAD<<endl; */
+    cout<<"c uprop, v00.0, "<<endl;
     cout<<"c (C) 2020 Mikolas Janota, mikolas.janota@gmail.com"<<endl;
     const string flafile(argc>1 ? argv[1] : "-");
     if (flafile=="-") cout<<"c reading from standard input"<<endl;
