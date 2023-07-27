@@ -32,6 +32,8 @@ ifdef DBG
 	CFLAGS+=-O0
 	CFLAGS+=-g
 	CFLAGS+=-DDBG
+	CFLAGS+=-fsanitize=address,undefined,bool
+	LNFLAGS+=-fsanitize=address,undefined,bool
 	MINISAT_DIR=./minisat/build/debug/lib
 	MSAT=ld
 else
