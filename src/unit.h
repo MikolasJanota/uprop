@@ -47,10 +47,8 @@ class Unit {
 void Unit::schedule(Lit literal) { trail.push_back(literal); }
 
 lbool Unit::value(Var variable) const {
-    const size_t index = (size_t)variable;
-    if (index >= values.size())
-        return l_Undef;
-    return values[index];
+    const size_t index = (size_t) variable;
+    return index < values.size() ? values[index] : l_Undef;
 }
 
 lbool Unit::value(Lit literal) const {

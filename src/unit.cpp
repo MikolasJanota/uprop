@@ -6,15 +6,15 @@
  */
 #include "unit.h"
 
-#ifdef DBG
+#ifdef NDEBUG
+#define TRACE(verbosity, command)
+#else
 #define TRACE(verbosity, command)                                              \
     do {                                                                       \
         if (verbose >= verbosity) {                                            \
             command                                                            \
         }                                                                      \
     } while (false)
-#else
-#define TRACE(verbosity, command)
 #endif
 
 static int verbose = 3;
@@ -48,7 +48,9 @@ bool Unit::is_failed_lit(Lit l) {
     while (trail.size() > orig) {
         TRACE(2, std::cerr << trail.back() << " popping has a value "
                            << value(trail.back()) << std::endl;);
-        values[var(trail.back())] = l_Undef;
+        const size_t v = var(trail.back());
+        if (v < values.size())
+            values[v] = l_Undef;
         trail.pop_back();
     }
     que_head = orig_que_head;
@@ -85,6 +87,7 @@ void Unit::eval(CNF &cnf) {
                 dirty_clauses[i] = true;
             }
         }
+
         if (!taut) {
             if (dirty_clauses[i]) {
                 cnf.push_back(LitSet::mk(ls));
@@ -210,6 +213,7 @@ bool Unit::propagate(Lit literal) {
                 break;
             }
         }
+
         if (new_watch_index > 0) { // new watch found
             // swap the new watch into index 1, and the old watch literal into
             // its index

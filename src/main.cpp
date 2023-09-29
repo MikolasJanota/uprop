@@ -6,7 +6,11 @@
  */
 
 #include "unit.h"
-/* #include "defs.h" */
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include "ReadCNF.h"
 #include "auxiliary.h"
 #include "minisat/core/Dimacs.h"
@@ -32,48 +36,48 @@ static int verbose = 0;
 
 int main(int argc, char **argv) {
 #ifndef NDEBUG
-    cout << "c DEBUG version." << endl;
+  cout << "c DEBUG version." << endl;
 #endif
-    /* cout<<"c uprop, v00.0, "<<GITHEAD<<endl; */
-    TRACE(1, cout << "c uprop, v00.0, " << endl;);
-    TRACE(1, cout << "c (C) 2020 Mikolas Janota, mikolas.janota@gmail.com"
-                  << endl;);
-    const string flafile(argc > 1 ? argv[1] : "-");
-    if (flafile == "-") {
-        TRACE(1, cout << "c reading from standard input" << endl;);
-    } else
-        TRACE(1, cout << "c reading from " << flafile << endl;);
-    return run_cnf(flafile);
+  cout << "c uprop, v00.0, " << endl;
+  cout << "c (C) 2020 Mikolas Janota, mikolas.janota@gmail.com" << endl;
+  const string flafile(argc > 1 ? argv[1] : "-");
+  if (flafile == "-")
+    cout << "c reading from standard input" << endl;
+  else
+    cout << "c reading from " << flafile << endl;
+  return run_cnf(flafile);
 }
 
-int run_cnf(const string &flafile) {
-    scoped_ptr<Reader> fr;
-    gzFile ff = Z_NULL;
-    if (flafile.size() == 1 && flafile[0] == '-') {
-        fr.attach(new Reader(cin));
-    } else {
-        ff = gzopen(flafile.c_str(), "rb");
-        if (ff == Z_NULL) {
-            cerr << "ERROR: Unable to open file: " << flafile << endl;
-            cerr << "ABORTING" << endl;
-            exit(1);
-        }
-        fr.attach(new Reader(ff));
+int run_cnf(const string& flafile) {
+  unique_ptr<Reader> fr;
+  gzFile ff = Z_NULL;
+  if (flafile.size() == 1 && flafile[0] == '-') {
+    fr.reset(new Reader(cin));
+  } else {
+    ff = gzopen(flafile.c_str(), "rb");
+    if (ff == Z_NULL) {
+      cerr << "ERROR: "
+           << "Unable to open file: " << flafile << endl;
+      cerr << "ABORTING" << endl;
+      exit(EXIT_FAILURE);
     }
-    ReadCNF reader(*fr);
-    try {
-        reader.read();
-    } catch (ReadException &rex) {
-        cerr << "ERROR: " << rex.what() << endl;
-        cerr << "ABORTING" << endl;
-        exit(EXIT_FAILURE);
-    }
-    TRACE(1, cout << "c done reading: " << read_cpu_time() << std::endl;);
-    if (!reader.get_header_read()) {
-        cerr << "ERROR: Missing header." << endl;
-        cerr << "ABORTING" << endl;
-        exit(EXIT_FAILURE);
-    }
+    fr.reset(new Reader(ff));
+  }
+  ReadCNF reader(*fr);
+  try {
+    reader.read();
+  } catch (ReadException& rex) {
+    cerr << "ERROR: " << rex.what() << endl;
+    cerr << "ABORTING" << endl;
+    exit(EXIT_FAILURE);
+  }
+  if (ff != Z_NULL) gzclose(ff);
+  cout << "c done reading: " << read_cpu_time() << std::endl;
+  if (!reader.get_header_read()) {
+    cerr << "ERROR: Missing header." << endl;
+    cerr << "ABORTING" << endl;
+    exit(EXIT_FAILURE);
+  }
 
     Unit up(reader.get_clauses());
     const bool original_propagation = up.propagate();
@@ -86,11 +90,16 @@ int run_cnf(const string &flafile) {
     serialize_variables(propagated, shaken);
     /* print_dimacs(propagated, std::cout); */
     print_dimacs(shaken, std::cout);
-    return EXIT_SUCCESS;
+
+    bool failed_lits = false;//TODO option
+    if (!failed_lits)
+        return EXIT_SUCCESS;
+
     if (!original_propagation) {
         TRACE(1, cout << "c Original propagation already failed." << endl;);
         return EXIT_SUCCESS;
     }
+
     bool fixpoint;
     int cycle_count = 0;
     bool all_defined;
