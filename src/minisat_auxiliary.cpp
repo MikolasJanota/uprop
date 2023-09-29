@@ -26,7 +26,7 @@ char get_sign(lbool l) {
 
 ostream& print(ostream& out, Lit l) {
   if (l==SATSPC::lit_Undef) return out<<"lit_Undef";
-  return out << (sign(l) ? "-" : "+") << var(l);
+  return out << (sign(l) ? "-" : "") << var(l);
 }
 
 ostream& print(ostream& out, const vec<Lit>& lv) {for (int i=0;i<lv.size();++i) out <<  lv[i] << " "; return out;}

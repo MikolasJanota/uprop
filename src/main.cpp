@@ -7,42 +7,54 @@
 
 #include "unit.h"
 /* #include "defs.h" */
-#include "minisat/utils/System.h"
-#include "minisat/utils/ParseUtils.h"
-#include "minisat/utils/Options.h"
+#include "ReadCNF.h"
+#include "auxiliary.h"
 #include "minisat/core/Dimacs.h"
 #include "minisat/core/Solver.h"
+#include "minisat/utils/Options.h"
+#include "minisat/utils/ParseUtils.h"
+#include "minisat/utils/System.h"
+#include <collections.h>
 #include <cstdlib>
-#include <string>
 #include <iostream>
+#include <string>
 #include <unordered_map>
-#include "auxiliary.h"
-#include "ReadCNF.h"
 using namespace std;
-int run_cnf(const string& flafile);
+int run_cnf(const string &flafile);
 
-int main(int argc, char** argv) {
+static int verbose = 0;
+#define TRACE(verbosity, command)                                              \
+    do {                                                                       \
+        if (verbose >= verbosity) {                                            \
+            command                                                            \
+        }                                                                      \
+    } while (false)
+
+int main(int argc, char **argv) {
 #ifndef NDEBUG
     cout << "c DEBUG version." << endl;
 #endif
     /* cout<<"c uprop, v00.0, "<<GITHEAD<<endl; */
-    cout<<"c uprop, v00.0, "<<endl;
-    cout<<"c (C) 2020 Mikolas Janota, mikolas.janota@gmail.com"<<endl;
-    const string flafile(argc>1 ? argv[1] : "-");
-    if (flafile=="-") cout<<"c reading from standard input"<<endl;
-    else cout<<"c reading from "<<flafile<<endl;
+    TRACE(1, cout << "c uprop, v00.0, " << endl;);
+    TRACE(1, cout << "c (C) 2020 Mikolas Janota, mikolas.janota@gmail.com"
+                  << endl;);
+    const string flafile(argc > 1 ? argv[1] : "-");
+    if (flafile == "-") {
+        TRACE(1, cout << "c reading from standard input" << endl;);
+    } else
+        TRACE(1, cout << "c reading from " << flafile << endl;);
     return run_cnf(flafile);
 }
 
-int run_cnf(const string& flafile) {
+int run_cnf(const string &flafile) {
     scoped_ptr<Reader> fr;
-    gzFile ff=Z_NULL;
-    if (flafile.size()==1 && flafile[0]=='-') {
+    gzFile ff = Z_NULL;
+    if (flafile.size() == 1 && flafile[0] == '-') {
         fr.attach(new Reader(cin));
     } else {
         ff = gzopen(flafile.c_str(), "rb");
         if (ff == Z_NULL) {
-            cerr << "ERROR: " << "Unable to open file: " << flafile << endl;
+            cerr << "ERROR: Unable to open file: " << flafile << endl;
             cerr << "ABORTING" << endl;
             exit(1);
         }
@@ -51,12 +63,12 @@ int run_cnf(const string& flafile) {
     ReadCNF reader(*fr);
     try {
         reader.read();
-    } catch (ReadException& rex) {
+    } catch (ReadException &rex) {
         cerr << "ERROR: " << rex.what() << endl;
         cerr << "ABORTING" << endl;
         exit(EXIT_FAILURE);
     }
-    cout<<"c done reading: "<<read_cpu_time()<<std::endl;
+    TRACE(1, cout << "c done reading: " << read_cpu_time() << std::endl;);
     if (!reader.get_header_read()) {
         cerr << "ERROR: Missing header." << endl;
         cerr << "ABORTING" << endl;
@@ -66,15 +78,25 @@ int run_cnf(const string& flafile) {
     Unit up(reader.get_clauses());
     const bool original_propagation = up.propagate();
     if (!original_propagation) {
-        cout << "Original propagation already failed." << endl;
+        TRACE(1, cout << "c Original propagation already failed." << endl;);
+    }
+    CNF propagated;
+    CNF shaken;
+    up.eval(propagated);
+    serialize_variables(propagated, shaken);
+    /* print_dimacs(propagated, std::cout); */
+    print_dimacs(shaken, std::cout);
+    return EXIT_SUCCESS;
+    if (!original_propagation) {
+        TRACE(1, cout << "c Original propagation already failed." << endl;);
         return EXIT_SUCCESS;
     }
     bool fixpoint;
-    int  cycle_count = 0;
+    int cycle_count = 0;
     bool all_defined;
-    int  failed_literal_counter = 0;
+    int failed_literal_counter = 0;
     do {
-        cout << "== CYCLE " <<  ++cycle_count << endl;
+        cout << "== CYCLE " << ++cycle_count << endl;
         fixpoint = true;
         all_defined = true;
         for (Var v = 1; v <= reader.get_max_id(); v++) {
